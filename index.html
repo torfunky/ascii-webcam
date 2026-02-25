@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>webcam ascii</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">webcam ascii</header>
+
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-label">color</div>
+        <div class="color-group">
+          <button
+            class="color-btn active"
+            data-color="#8bb5ad"
+            style="--c: #8bb5ad"
+            title="green"
+          ></button>
+          <button
+            class="color-btn"
+            data-color="#c7809b"
+            style="--c: #c7809b"
+            title="pink"
+          ></button>
+          <button
+            class="color-btn"
+            data-color="#ddc088"
+            style="--c: #ddc088"
+            title="gold"
+          ></button>
+          <button
+            class="color-btn"
+            data-color="#c7c2bb"
+            style="--c: #c7c2bb"
+            title="neutral"
+          ></button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">chars</div>
+        <div class="char-group">
+          <button class="char-btn active" data-chars="@%#*+=-:. ">dense</button>
+          <button class="char-btn" data-chars="█▓▒░ ">blocks</button>
+          <button class="char-btn" data-chars="#=-. ">simple</button>
+          <button class="char-btn" data-chars="●•·. ">dots</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="slider-header">
+          <span class="section-label">threshold</span>
+          <span class="slider-val" id="threshold-val">50%</span>
+        </div>
+        <input
+          type="range"
+          id="threshold"
+          min="0.05"
+          max="0.95"
+          step="0.01"
+          value="0.5"
+        />
+      </div>
+
+      <div class="sidebar-section">
+        <div class="slider-header">
+          <span class="section-label">contrast</span>
+          <span class="slider-val" id="contrast-val">1.0x</span>
+        </div>
+        <input
+          type="range"
+          id="contrast"
+          min="0.5"
+          max="3"
+          step="0.05"
+          value="1"
+        />
+      </div>
+
+      <div class="sidebar-section">
+        <div class="slider-header">
+          <span class="section-label">density</span>
+          <span class="slider-val" id="size-val">1.0x</span>
+        </div>
+        <input
+          type="range"
+          id="size"
+          min="0.4"
+          max="2.5"
+          step="0.05"
+          value="1"
+        />
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">layers</div>
+        <label class="toggle-row">
+          <input type="checkbox" id="videoLayer" /> video feed
+        </label>
+        <div class="sub-control" id="videoOpacityControl">
+          <div class="slider-header">
+            <span class="section-label">opacity</span>
+            <span class="slider-val" id="video-opacity-val">30%</span>
+          </div>
+          <input
+            type="range"
+            id="videoOpacity"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0.3"
+          />
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">options</div>
+        <label class="toggle-row">
+          <input type="checkbox" id="mirror" checked /> mirror
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" id="invert" /> invert
+        </label>
+      </div>
+
+      <footer class="site-footer">
+        <div id="status">allow camera access</div>
+        <div>...built by reiley</div>
+      </footer>
+    </aside>
+
+    <div class="content">
+      <canvas id="video-canvas"></canvas>
+      <pre id="ascii-output"></pre>
+    </div>
+
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>
