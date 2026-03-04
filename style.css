@@ -112,6 +112,24 @@ body {
   color: var(--accent);
 }
 
+.randomizer-btn {
+  font-family: monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  padding: 3px 7px;
+  border: 1px solid #ddd9d3;
+  background: transparent;
+  color: #c7c2bb;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  width: 100%;
+}
+
+.randomizer-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* sliders */
 
 .slider-header {
@@ -185,6 +203,11 @@ input[type="range"] {
   position: absolute;
   opacity: 0;
   transition: opacity 0.3s;
+}
+
+#letter-canvas {
+  position: absolute;
+  display: none;
 }
 
 #ascii-output {

@@ -3,6 +3,8 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d", { willReadFrequently: true });
 const videoCanvas = document.getElementById("video-canvas");
 const videoCtx = videoCanvas.getContext("2d");
+const letterCanvas = document.getElementById("letter-canvas");
+const letterCtx = letterCanvas.getContext("2d");
 const output = document.getElementById("ascii-output");
 const content = document.querySelector(".content");
 const status = document.getElementById("status");
@@ -17,6 +19,7 @@ const state = {
   sizeScale: 1,
   videoLayer: false,
   videoOpacity: 0.3,
+  letterMode: false,
 };
 
 // ── render loop ──────────────────────────────────────────────────────────────
@@ -24,6 +27,38 @@ const state = {
 // reusable canvas for measuring actual rendered char width
 const measureCtx = document.createElement("canvas").getContext("2d");
 let videoAspect = 0;
+
+// ── letter mode ───────────────────────────────────────────────────────────────
+
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const JAPANESE = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん日月火水木金土山川田人口目耳手足";
+const BINARY = "01";
+const BUCKETS = 8; // number of font-size steps (= number of font changes per frame)
+let outputFontFamily = ""; // cached after first render
+let canvasChars = LETTERS;
+let canvasFontScale = 1;
+let letterGrid = [];
+let lgCols = 0;
+let lgRows = 0;
+
+function updateLetterGrid(cols, rows) {
+  const total = cols * rows;
+  if (lgCols !== cols || lgRows !== rows) {
+    // full rebuild on size change
+    letterGrid = Array.from({ length: total }, () =>
+      canvasChars[Math.floor(Math.random() * canvasChars.length)],
+    );
+    lgCols = cols;
+    lgRows = rows;
+  } else {
+    // randomly shift ~2% of letters per frame for subtle drift
+    const n = Math.ceil(total * 0.02);
+    for (let i = 0; i < n; i++) {
+      letterGrid[Math.floor(Math.random() * total)] =
+        canvasChars[Math.floor(Math.random() * canvasChars.length)];
+    }
+  }
+}
 
 function render() {
   if (!videoAspect && video.videoWidth) {
@@ -81,26 +116,80 @@ function render() {
   ctx.restore();
 
   const { data } = ctx.getImageData(0, 0, cols, rows);
-  const chars = state.charSet;
-  const last = chars.length - 1;
-  let text = "";
 
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const i = (y * cols + x) * 4;
-      let b =
-        (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
-      b = (b - 0.5) * state.contrast + 0.5;
-      b = Math.max(0, Math.min(1, b));
-      const t = state.threshold;
-      b = b < t ? (b / t) * 0.5 : 0.5 + ((b - t) / (1 - t)) * 0.5;
-      if (state.invert) b = 1 - b;
-      text += chars[Math.floor(b * last)];
+  if (state.letterMode) {
+    if (!outputFontFamily) outputFontFamily = getComputedStyle(output).fontFamily;
+
+    // sync letter-canvas bounds to match the ASCII grid
+    if (letterCanvas.width !== vcW || letterCanvas.height !== vcH) {
+      letterCanvas.width  = vcW;
+      letterCanvas.height = vcH;
     }
-    if (y < rows - 1) text += "\n";
-  }
+    letterCanvas.style.left = videoCanvas.style.left;
+    letterCanvas.style.top  = videoCanvas.style.top;
 
-  output.textContent = text;
+    updateLetterGrid(cols, rows);
+    letterCtx.clearRect(0, 0, vcW, vcH);
+    letterCtx.fillStyle = state.color;
+    letterCtx.textAlign = "center";
+    letterCtx.textBaseline = "middle";
+
+    // pass 1: bucket each cell by brightness (avoids per-cell font changes)
+    const buckets = Array.from({ length: BUCKETS }, () => []);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const i = (y * cols + x) * 4;
+        let b =
+          (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+        b = (b - 0.5) * state.contrast + 0.5;
+        b = Math.max(0, Math.min(1, b));
+        const t = state.threshold;
+        b = b < t ? (b / t) * 0.5 : 0.5 + ((b - t) / (1 - t)) * 0.5;
+        if (state.invert) b = 1 - b;
+        const s = 1 - b;
+        if (s < 1 / BUCKETS) continue;
+        buckets[Math.min(BUCKETS - 1, Math.floor(s * BUCKETS))].push(x, y);
+      }
+    }
+
+    // pass 2: one font-size set per bucket, then draw all cells in it
+    for (let bk = 0; bk < BUCKETS; bk++) {
+      const cells = buckets[bk];
+      if (!cells.length) continue;
+      letterCtx.font = `${(lineH * (bk + 1)) / BUCKETS * canvasFontScale}px ${outputFontFamily}`;
+      for (let p = 0; p < cells.length; p += 2) {
+        letterCtx.fillText(
+          letterGrid[cells[p + 1] * cols + cells[p]],
+          (cells[p] + 0.5) * charW,
+          (cells[p + 1] + 0.5) * lineH,
+        );
+      }
+    }
+
+    output.style.display = "none";
+    letterCanvas.style.display = "block";
+  } else {
+    output.style.display = "";
+    letterCanvas.style.display = "none";
+    const chars = state.charSet;
+    const last = chars.length - 1;
+    let text = "";
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const i = (y * cols + x) * 4;
+        let b =
+          (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+        b = (b - 0.5) * state.contrast + 0.5;
+        b = Math.max(0, Math.min(1, b));
+        const t = state.threshold;
+        b = b < t ? (b / t) * 0.5 : 0.5 + ((b - t) / (1 - t)) * 0.5;
+        if (state.invert) b = 1 - b;
+        text += chars[Math.floor(b * last)];
+      }
+      if (y < rows - 1) text += "\n";
+    }
+    output.textContent = text;
+  }
 
   if (state.videoLayer) {
     videoCtx.save();
@@ -138,7 +227,25 @@ document.querySelectorAll(".char-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".char-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    state.charSet = btn.dataset.chars;
+    if (btn.dataset.mode === "letters") {
+      canvasChars = LETTERS;
+      canvasFontScale = 1;
+      lgCols = lgRows = 0;
+      state.letterMode = true;
+    } else if (btn.dataset.mode === "japanese") {
+      canvasChars = JAPANESE;
+      canvasFontScale = 0.6;
+      lgCols = lgRows = 0;
+      state.letterMode = true;
+    } else if (btn.dataset.mode === "binary") {
+      canvasChars = BINARY;
+      canvasFontScale = 1;
+      lgCols = lgRows = 0;
+      state.letterMode = true;
+    } else {
+      state.letterMode = false;
+      state.charSet = btn.dataset.chars;
+    }
   });
 });
 
@@ -190,6 +297,35 @@ document.getElementById("invert").addEventListener("change", (e) => {
   state.invert = e.target.checked;
 });
 
+// randomize
+document.getElementById("randomize").addEventListener("click", () => {
+  const colorBtns = [...document.querySelectorAll(".color-btn")];
+  colorBtns[Math.floor(Math.random() * colorBtns.length)].click();
+
+  const charBtns = [...document.querySelectorAll(".char-btn")];
+  charBtns[Math.floor(Math.random() * charBtns.length)].click();
+
+  const threshold = document.getElementById("threshold");
+  threshold.value = (Math.random() * 0.9 + 0.05).toFixed(2);
+  threshold.dispatchEvent(new Event("input"));
+
+  const contrast = document.getElementById("contrast");
+  contrast.value = (Math.random() * 2 + 1).toFixed(2);
+  contrast.dispatchEvent(new Event("input"));
+
+  const size = document.getElementById("size");
+  size.value = (Math.random() * 2.1 + 0.4).toFixed(2);
+  size.dispatchEvent(new Event("input"));
+
+  const mirror = document.getElementById("mirror");
+  mirror.checked = Math.random() > 0.5;
+  mirror.dispatchEvent(new Event("change"));
+
+  const invert = document.getElementById("invert");
+  invert.checked = Math.random() > 0.5;
+  invert.dispatchEvent(new Event("change"));
+});
+
 // ── init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -212,3 +348,4 @@ async function init() {
 }
 
 init();
+
